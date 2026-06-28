@@ -139,10 +139,6 @@ export default function AdminLoginPage() {
           </Button>
         </form>
 
-        <div className="mt-8 text-center text-xs text-[var(--color-muted)] border-t border-white/5 pt-6">
-          <p>Gunakan fallback credential untuk demo:</p>
-          <p className="font-mono mt-1 text-[var(--color-accent)]/80">admin@motrekaja.com / admin123</p>
-        </div>
       </motion.div>
     </div>
   );
