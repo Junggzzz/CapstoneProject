@@ -2,955 +2,1081 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
+import Button from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
-import { 
-  Image as ImageIcon, 
-  BookOpen, 
-  Inbox, 
-  Database, 
-  LogOut, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Check, 
-  X, 
-  AlertTriangle, 
-  FileCode,
-  ExternalLink,
-  Info
-} from 'lucide-react';
 
-// Fallback portfolio data
-const INITIAL_PORTFOLIO = [
-  { id: '1',  url: '/images/best_1.jpg',  title: 'AHI Trip Bali – Konvoi di Jalan Raya',   category: 'Event'    },
-  { id: '2',  url: '/images/best_2.jpg',  title: 'AHI Trip Bali – Day 4 Adventure',         category: 'Event'    },
-  { id: '3',  url: '/images/best_3.jpg',  title: 'Batur International Trail Run – Finish',  category: 'Sports'   },
-  { id: '4',  url: '/images/best_4.jpg',  title: 'Batur Trail Run – Pack Run',               category: 'Sports'   },
-  { id: '5',  url: '/images/best_5.jpg',  title: 'Batur Trail Run – Race Day',               category: 'Sports'   },
-  { id: '6',  url: '/images/best_6.jpg',  title: 'Batur Trail Run – Solo Sprint',            category: 'Sports'   },
-  { id: '7',  url: '/images/best_7.jpg',  title: 'Batur Trail Run – Group Run Savanna',      category: 'Sports'   },
-  { id: '8',  url: '/images/best_8.jpg',  title: 'Riding Pandawa-Melasti – On The Road',     category: 'Sports'   },
+interface PortfolioItem {
+  id: string;
+  url: string;
+  title: string;
+  category: string;
+  created_at?: string;
+}
+
+interface Inquiry {
+  id: string;
+  name: string;
+  email: string;
+  booking_date: string;
+  message: string;
+  created_at?: string;
+}
+
+// Fallback local pictures options for quick testing
+const EVENTS_PRESET_CONFIG = [
+  { prefix: 'riding_pandawa' },
+  { prefix: 'running_passion' },
+  { prefix: 'ahi_trip' },
+  { prefix: 'batur_trail' },
+  { prefix: 'specialized_ride' },
+  { prefix: 'trail_kantorun' },
+  { prefix: 'langit_birthday' },
+  { prefix: 'simply_padel' },
 ];
 
-// Fallback journals data
-const INITIAL_JOURNALS = [
-  { 
-    id: '1', 
-    title: 'Merekam Momen Magis di Bali', 
-    excerpt: 'Di balik layar sesi pre-wedding eksklusif kami di pantai Melasti, menangkap golden hour yang sempurna dengan pasangan yang luar biasa.', 
-    date: '12 Mei 2026', 
-    imageUrl: '/images/best_14.jpg',
-    videoUrl: '' 
-  },
-  { 
-    id: '2', 
-    title: 'Komersial Produk Premium', 
-    excerpt: 'Tantangan pencahayaan studio untuk menonjolkan tekstur dan detail produk jam tangan mewah.', 
-    date: '28 April 2026', 
-    imageUrl: '/images/best_16.jpg',
-    videoUrl: '' 
-  },
+const LOCAL_PRESET_IMAGES = [
+  ...EVENTS_PRESET_CONFIG.flatMap((evt) =>
+    Array.from({ length: 10 }, (_, idx) => `/images/${evt.prefix}_${idx + 1}.jpg`)
+  ),
+  '/portofolio/weddingevent.png',
+  '/portofolio/watchproduct.png',
+  '/portofolio/personalportrait.png'
 ];
-
-// Fallback inquiries data
-const INITIAL_INQUIRIES = [
-  {
-    id: '1',
-    name: 'Andi Pratama',
-    email: 'andi.pratama@example.com',
-    booking_date: '2026-07-15',
-    message: 'Saya ingin memesan sesi foto olahraga batur trail run untuk kelompok lari kami.',
-    created_at: new Date().toISOString()
-  },
-  {
-    id: '2',
-    name: 'Citra Kirana',
-    email: 'citra@example.com',
-    booking_date: '2026-08-20',
-    message: 'Halo Motrek Aja, apakah melayani pemotretan komersil produk fashion luar ruangan?',
-    created_at: new Date(Date.now() - 86400000).toISOString()
-  }
-];
-
-const CATEGORIES = ['Event', 'Sports', 'Wedding', 'Portrait', 'Commercial'];
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'journals' | 'inquiries' | 'setup'>('portfolio');
-  const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<'supabase' | 'demo'>('supabase');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  
+  // Navigation Tabs
+  const [activeTab, setActiveTab] = useState<'gallery' | 'categories' | 'inquiries'>('gallery');
 
-  // Authenticated state
-  const [authenticated, setAuthenticated] = useState(false);
+  // Data States
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Db diagnostic states
-  const [diagnostics, setDiagnostics] = useState({
-    portfolioTable: false,
-    inquiriesTable: false,
-    journalsTable: false,
-  });
+  // Grouping and filtering states
+  const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState('Semua');
 
-  // Data states
-  const [portfolioList, setPortfolioList] = useState<any[]>([]);
-  const [journalsList, setJournalsList] = useState<any[]>([]);
-  const [inquiriesList, setInquiriesList] = useState<any[]>([]);
-
-  // Modals state
-  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
-  const [editingPhoto, setEditingPhoto] = useState<any | null>(null);
-  const [photoForm, setPhotoForm] = useState({ title: '', category: 'Event', url: '' });
-
-  const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
-  const [editingJournal, setEditingJournal] = useState<any | null>(null);
-  const [journalForm, setJournalForm] = useState({ title: '', excerpt: '', imageUrl: '', videoUrl: '', date: '' });
-
-  useEffect(() => {
-    // Auth & diagnostic checks
-    const checkAuthAndFetch = async () => {
-      const isLogged = sessionStorage.getItem('motrek_admin_logged') === 'true';
-      if (!isLogged) {
-        router.push('/admin/login');
-        return;
-      }
-      setAuthenticated(true);
-
-      const savedMode = sessionStorage.getItem('motrek_admin_mode') || 'supabase';
-      setMode(savedMode as 'supabase' | 'demo');
-
-      if (savedMode === 'demo') {
-        // Load from LocalStorage or Fallback initial data
-        const localP = localStorage.getItem('demo_portfolio');
-        const localJ = localStorage.getItem('demo_journals');
-        const localI = localStorage.getItem('demo_inquiries');
-
-        setPortfolioList(localP ? JSON.parse(localP) : INITIAL_PORTFOLIO);
-        setJournalsList(localJ ? JSON.parse(localJ) : INITIAL_JOURNALS);
-        setInquiriesList(localI ? JSON.parse(localI) : INITIAL_INQUIRIES);
-        setLoading(false);
-      } else {
-        // Run database check
-        try {
-          const { data: pData, error: pErr } = await supabase.from('portfolio').select('*');
-          const { data: iData, error: iErr } = await supabase.from('inquiries').select('*');
-          const { data: jData, error: jErr } = await supabase.from('journals').select('*');
-
-          const diag = {
-            portfolioTable: !pErr,
-            inquiriesTable: !iErr,
-            journalsTable: !jErr,
-          };
-          setDiagnostics(diag);
-
-          // If tables don't exist in Supabase database, fall back or suggest setup tab
-          if (pErr || iErr || jErr) {
-            console.warn("Database not fully ready, tables missing. Directing to setup diagnostics.");
-            setActiveTab('setup');
-            // Populate lists with Initial Fallback for visual rendering
-            setPortfolioList(INITIAL_PORTFOLIO);
-            setJournalsList(INITIAL_JOURNALS);
-            setInquiriesList(INITIAL_INQUIRIES);
-          } else {
-            setPortfolioList(pData || []);
-            setInquiriesList(iData || []);
-            setJournalsList(jData || []);
-          }
-        } catch (err) {
-          console.error("Supabase load error:", err);
-          setActiveTab('setup');
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    checkAuthAndFetch();
-  }, [router]);
-
-  // Persist local demo data
-  const saveDemoData = (type: 'portfolio' | 'journals' | 'inquiries', data: any[]) => {
-    localStorage.setItem(`demo_${type}`, JSON.stringify(data));
+  const toggleEvent = (title: string) => {
+    setExpandedEvents(prev => ({
+      ...prev,
+      [title]: !prev[title]
+    }));
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    sessionStorage.removeItem('motrek_admin_logged');
-    sessionStorage.removeItem('motrek_admin_mode');
+  // Modal / Form States
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<PortfolioItem | null>(null);
+  const [formTitle, setFormTitle] = useState('');
+  const [formCategory, setFormCategory] = useState('');
+  const [formUrl, setFormUrl] = useState('');
+  const [formUrlPreset, setFormUrlPreset] = useState('');
+
+  // File upload states
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFilePreview, setUploadFilePreview] = useState<string>('');
+
+  // Edit Event Name states
+  const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
+  const [oldEventName, setOldEventName] = useState('');
+  const [newEventName, setNewEventName] = useState('');
+
+  // Category Modal / Form States
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Status Alerts
+  const [statusMsg, setStatusMsg] = useState({ type: 'success' as 'success' | 'error', text: '' });
+
+  // 1. Auth check
+  useEffect(() => {
+    const loggedIn = localStorage.getItem('motrek_admin_logged_in') === 'true';
+    if (!loggedIn) {
+      router.push('/admin/login');
+    } else {
+      setIsLoggedIn(true);
+      setAdminEmail(localStorage.getItem('motrek_admin_email') || 'admin@motrekaja.com');
+    }
+  }, [router]);
+
+  // 2. Fetch Data
+  const fetchData = async () => {
+    if (!isLoggedIn) return;
+    setIsLoading(true);
+    try {
+      // Fetch portfolio
+      const { data: pData, error: pError } = await supabase
+        .from('portfolio')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!pError && pData) {
+        setPortfolio(pData);
+        // Extract unique categories for initialization if categories not loaded yet
+        const uniqueCats = Array.from(new Set(pData.map(item => item.category)));
+        // Pre-fill categories state with unique values, merging with defaults
+        const defaultCats = ['Sports', 'Event', 'Wedding', 'Portrait', 'Commercial'];
+        const mergedCats = Array.from(new Set([...defaultCats, ...uniqueCats]));
+        setCategories(mergedCats);
+      }
+
+      // Fetch inquiries
+      const { data: iData, error: iError } = await supabase
+        .from('inquiries')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!iError && iData) {
+        setInquiries(iData);
+      }
+    } catch (err) {
+      console.error('Error fetching data from Supabase:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchData();
+    }
+  }, [isLoggedIn]);
+
+  // Handle Logout
+  const handleLogout = () => {
+    localStorage.removeItem('motrek_admin_logged_in');
+    localStorage.removeItem('motrek_admin_email');
     router.push('/admin/login');
   };
 
-  // --- PORTFOLIO OPERATIONS ---
-  const handleOpenPhotoModal = (photo: any = null) => {
-    if (photo) {
-      setEditingPhoto(photo);
-      setPhotoForm({ title: photo.title, category: photo.category, url: photo.url });
-    } else {
-      setEditingPhoto(null);
-      setPhotoForm({ title: '', category: 'Event', url: '/images/best_1.jpg' });
-    }
-    setIsPhotoModalOpen(true);
+  // Open Modal for Add
+  const handleOpenAddModal = () => {
+    setEditingItem(null);
+    setFormTitle('');
+    setFormCategory(categories[0] || 'Wedding');
+    setFormUrl('');
+    setFormUrlPreset(LOCAL_PRESET_IMAGES[0]);
+    setUploadFile(null);
+    setUploadFilePreview('');
+    setIsModalOpen(true);
   };
 
-  const handleSavePhoto = async (e: React.FormEvent) => {
+  // Open Modal for Add under specific Event
+  const handleOpenAddModalForEvent = (eventName: string, category: string) => {
+    setEditingItem(null);
+    setFormTitle(eventName);
+    setFormCategory(category);
+    setFormUrl('');
+    setFormUrlPreset(LOCAL_PRESET_IMAGES[0]);
+    setUploadFile(null);
+    setUploadFilePreview('');
+    setIsModalOpen(true);
+  };
+
+  // Handle Event Name Edit Modal
+  const handleOpenEditEventModal = (eventName: string) => {
+    setOldEventName(eventName);
+    setNewEventName(eventName);
+    setIsEditEventModalOpen(true);
+  };
+
+  const handleSaveEventName = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === 'demo') {
-      let updatedList = [...portfolioList];
-      if (editingPhoto) {
-        updatedList = updatedList.map(item => 
-          item.id === editingPhoto.id ? { ...item, ...photoForm } : item
-        );
-      } else {
-        const newItem = {
-          id: Date.now().toString(),
-          ...photoForm
-        };
-        updatedList = [newItem, ...updatedList];
-      }
-      setPortfolioList(updatedList);
-      saveDemoData('portfolio', updatedList);
-      setIsPhotoModalOpen(false);
-    } else {
-      setLoading(true);
-      try {
-        if (editingPhoto) {
-          const { error } = await supabase
-            .from('portfolio')
-            .update({ title: photoForm.title, category: photoForm.category, url: photoForm.url })
-            .eq('id', editingPhoto.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from('portfolio')
-            .insert([{ title: photoForm.title, category: photoForm.category, url: photoForm.url }]);
-          if (error) throw error;
-        }
+    if (!newEventName.trim()) {
+      showStatus('error', 'Nama kegiatan tidak boleh kosong.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('portfolio')
+        .update({ title: newEventName.trim() })
+        .eq('title', oldEventName);
 
-        // Refresh data
-        const { data } = await supabase.from('portfolio').select('*').order('created_at', { ascending: false });
-        setPortfolioList(data || []);
-        setIsPhotoModalOpen(false);
-      } catch (err: any) {
-        alert("Gagal menyimpan foto ke Supabase: " + err.message);
-      } finally {
-        setLoading(false);
-      }
+      if (error) throw error;
+      showStatus('success', `Nama kegiatan berhasil diubah dari "${oldEventName}" menjadi "${newEventName}".`);
+      setIsEditEventModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      showStatus('error', err.message || 'Gagal mengubah nama kegiatan.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleDeletePhoto = async (id: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus foto portofolio ini?")) return;
-
-    if (mode === 'demo') {
-      const updatedList = portfolioList.filter(item => item.id !== id);
-      setPortfolioList(updatedList);
-      saveDemoData('portfolio', updatedList);
-    } else {
-      setLoading(true);
-      try {
-        const { error } = await supabase.from('portfolio').delete().eq('id', id);
-        if (error) throw error;
-
-        // Refresh data
-        const { data } = await supabase.from('portfolio').select('*').order('created_at', { ascending: false });
-        setPortfolioList(data || []);
-      } catch (err: any) {
-        alert("Gagal menghapus foto dari Supabase: " + err.message);
-      } finally {
-        setLoading(false);
-      }
+  // Handle local file selection from device
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadFilePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  // --- JOURNAL OPERATIONS ---
-  const handleOpenJournalModal = (journal: any = null) => {
-    if (journal) {
-      setEditingJournal(journal);
-      setJournalForm({ 
-        title: journal.title, 
-        excerpt: journal.excerpt, 
-        imageUrl: journal.imageUrl || journal.image_url || '', 
-        videoUrl: journal.videoUrl || journal.video_url || '',
-        date: journal.date 
-      });
-    } else {
-      setEditingJournal(null);
-      setJournalForm({ title: '', excerpt: '', imageUrl: '/images/best_14.jpg', videoUrl: '', date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) });
+  // Delete entire Event (all photos with same title)
+  const handleDeleteEvent = async (eventName: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus seluruh kegiatan "${eventName}" beserta semua fotonya?`)) return;
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('portfolio')
+        .delete()
+        .eq('title', eventName);
+      if (error) throw error;
+      showStatus('success', `Seluruh foto dari kegiatan "${eventName}" berhasil dihapus.`);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      showStatus('error', err.message || 'Gagal menghapus kegiatan.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsJournalModalOpen(true);
   };
 
-  const handleSaveJournal = async (e: React.FormEvent) => {
+  // Open Modal for Edit
+  const handleOpenEditModal = (item: PortfolioItem) => {
+    setEditingItem(item);
+    setFormTitle(item.title);
+    setFormCategory(item.category);
+    setUploadFile(null);
+    setUploadFilePreview('');
+    
+    // Check if URL matches one of local presets
+    if (LOCAL_PRESET_IMAGES.includes(item.url)) {
+      setFormUrlPreset(item.url);
+      setFormUrl('');
+    } else {
+      setFormUrlPreset('custom');
+      setFormUrl(item.url);
+    }
+    setIsModalOpen(true);
+  };
+
+  // Save Portfolio Item (Create or Update)
+  const handleSavePortfolio = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === 'demo') {
-      let updatedList = [...journalsList];
-      if (editingJournal) {
-        updatedList = updatedList.map(item => 
-          item.id === editingJournal.id ? { ...item, ...journalForm } : item
-        );
-      } else {
-        const newItem = {
-          id: Date.now().toString(),
-          ...journalForm
-        };
-        updatedList = [newItem, ...updatedList];
-      }
-      setJournalsList(updatedList);
-      saveDemoData('journals', updatedList);
-      setIsJournalModalOpen(false);
-    } else {
-      setLoading(true);
-      try {
-        const dbPayload = {
-          title: journalForm.title,
-          excerpt: journalForm.excerpt,
-          date: journalForm.date,
-          imageUrl: journalForm.imageUrl,
-          videoUrl: journalForm.videoUrl || null
-        };
+    
+    if (!formTitle || !formCategory) {
+      showStatus('error', 'Semua field wajib diisi.');
+      return;
+    }
 
-        if (editingJournal) {
-          const { error } = await supabase
-            .from('journals')
-            .update(dbPayload)
-            .eq('id', editingJournal.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from('journals')
-            .insert([dbPayload]);
-          if (error) throw error;
+    let targetUrl = '';
+    
+    if (formUrlPreset === 'upload') {
+      if (!uploadFile && !editingItem) {
+        showStatus('error', 'Silakan pilih file gambar dari device Anda.');
+        return;
+      }
+      if (uploadFile) {
+        setIsLoading(true);
+        try {
+          // Coba upload ke Supabase Storage terlebih dahulu
+          const fileExt = uploadFile.name.split('.').pop();
+          const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+          const filePath = `${fileName}`;
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('portfolio')
+            .upload(filePath, uploadFile);
+
+          if (!uploadError && uploadData) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('portfolio')
+              .getPublicUrl(filePath);
+            targetUrl = publicUrl;
+          } else {
+            // Gunakan Base64 data URL jika upload storage gagal
+            targetUrl = uploadFilePreview;
+          }
+        } catch (err) {
+          // Fallback ke Base64 data URL
+          targetUrl = uploadFilePreview;
+        } finally {
+          setIsLoading(false);
         }
-
-        // Refresh data
-        const { data } = await supabase.from('journals').select('*').order('created_at', { ascending: false });
-        setJournalsList(data || []);
-        setIsJournalModalOpen(false);
-      } catch (err: any) {
-        alert("Gagal menyimpan jurnal ke Supabase: " + err.message);
-      } finally {
-        setLoading(false);
+      } else if (editingItem) {
+        targetUrl = editingItem.url;
       }
-    }
-  };
-
-  const handleDeleteJournal = async (id: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus artikel jurnal ini?")) return;
-
-    if (mode === 'demo') {
-      const updatedList = journalsList.filter(item => item.id !== id);
-      setJournalsList(updatedList);
-      saveDemoData('journals', updatedList);
     } else {
-      setLoading(true);
-      try {
-        const { error } = await supabase.from('journals').delete().eq('id', id);
-        if (error) throw error;
+      targetUrl = formUrlPreset === 'custom' ? formUrl : formUrlPreset;
+    }
 
-        // Refresh data
-        const { data } = await supabase.from('journals').select('*').order('created_at', { ascending: false });
-        setJournalsList(data || []);
-      } catch (err: any) {
-        alert("Gagal menghapus jurnal dari Supabase: " + err.message);
-      } finally {
-        setLoading(false);
+    if (!targetUrl) {
+      showStatus('error', 'URL Gambar atau file upload tidak valid.');
+      return;
+    }
+
+    try {
+      if (editingItem) {
+        // Edit Mode
+        const { error } = await supabase
+          .from('portfolio')
+          .update({
+            title: formTitle.trim(),
+            category: formCategory,
+            url: targetUrl
+          })
+          .eq('id', editingItem.id);
+
+        if (error) throw error;
+        showStatus('success', 'Foto portofolio berhasil diperbarui.');
+      } else {
+        // Create Mode
+        const { error } = await supabase
+          .from('portfolio')
+          .insert([{
+            title: formTitle.trim(),
+            category: formCategory,
+            url: targetUrl
+          }]);
+
+        if (error) throw error;
+        showStatus('success', 'Foto portofolio baru berhasil ditambahkan.');
       }
+      setIsModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      showStatus('error', err.message || 'Gagal menyimpan data.');
     }
   };
 
-  // --- INQUIRIES OPERATIONS ---
+  // Delete Portfolio Item
+  const handleDeletePortfolio = async (id: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus foto portofolio ini?')) return;
+    try {
+      const { error } = await supabase
+        .from('portfolio')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      showStatus('success', 'Foto portofolio berhasil dihapus.');
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      showStatus('error', err.message || 'Gagal menghapus data.');
+    }
+  };
+
+  // Add Custom Category
+  const handleAddCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    if (categories.includes(newCategoryName.trim())) {
+      showStatus('error', 'Kategori sudah ada.');
+      return;
+    }
+    setCategories([...categories, newCategoryName.trim()]);
+    setNewCategoryName('');
+    showStatus('success', 'Kategori baru berhasil ditambahkan ke list dropdown.');
+  };
+
+  // Remove Category
+  const handleRemoveCategory = (catToRemove: string) => {
+    if (confirm(`Hapus kategori "${catToRemove}" dari daftar filter dashboard?`)) {
+      setCategories(categories.filter(c => c !== catToRemove));
+      showStatus('success', 'Kategori dihapus dari daftar dropdown.');
+    }
+  };
+
+  // Delete Inquiry message
   const handleDeleteInquiry = async (id: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus inquiry ini?")) return;
+    if (!confirm('Apakah Anda yakin ingin menghapus data inkuiri ini?')) return;
+    try {
+      const { error } = await supabase
+        .from('inquiries')
+        .delete()
+        .eq('id', id);
 
-    if (mode === 'demo') {
-      const updatedList = inquiriesList.filter(item => item.id !== id);
-      setInquiriesList(updatedList);
-      saveDemoData('inquiries', updatedList);
-    } else {
-      setLoading(true);
-      try {
-        const { error } = await supabase.from('inquiries').delete().eq('id', id);
-        if (error) throw error;
-
-        // Refresh data
-        const { data } = await supabase.from('inquiries').select('*').order('created_at', { ascending: false });
-        setInquiriesList(data || []);
-      } catch (err: any) {
-        alert("Gagal menghapus inquiry dari Supabase: " + err.message);
-      } finally {
-        setLoading(false);
-      }
+      if (error) throw error;
+      showStatus('success', 'Inkuiri berhasil dihapus.');
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      showStatus('error', err.message || 'Gagal menghapus inkuiri.');
     }
   };
 
-  if (!authenticated) {
+  // Seed default portfolio data into Supabase
+  const handleSeedDefaultData = async () => {
+    setIsLoading(true);
+    try {
+      const eventsConfig = [
+        { prefix: 'riding_pandawa',  title: 'Riding Pandawa-Melasti',            category: 'Sports'   },
+        { prefix: 'running_passion',  title: 'Running for Passion',              category: 'Sports'   },
+        { prefix: 'ahi_trip',         title: 'AHI Trip Bali',                    category: 'Event'    },
+        { prefix: 'batur_trail',      title: 'Batur Trail Run',                  category: 'Sports'   },
+        { prefix: 'specialized_ride', title: 'Specialized Day 1 Ride',           category: 'Sports'   },
+        { prefix: 'trail_kantorun',   title: 'Trail Run Kantorun x Sradha Coffee', category: 'Event'   },
+        { prefix: 'langit_birthday',  title: 'Langit 6th Birthday',              category: 'Portrait' },
+        { prefix: 'simply_padel',     title: 'Simply Padel',                     category: 'Sports'   },
+      ];
+
+      const defaultData = eventsConfig.flatMap((evt) => 
+        Array.from({ length: 10 }, (_, idx) => ({
+          url: `/images/${evt.prefix}_${idx + 1}.jpg`,
+          title: evt.title,
+          category: evt.category
+        }))
+      );
+
+      // Hapus data seed sebelumnya agar tidak duplikat saat tombol diklik lagi
+      await supabase
+        .from('portfolio')
+        .delete()
+        .like('url', '/images/%');
+
+      const { error } = await supabase
+        .from('portfolio')
+        .insert(defaultData);
+
+      if (error) throw error;
+      showStatus('success', 'Seed data portofolio default berhasil dimasukkan ke database!');
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      showStatus('error', err.message || 'Gagal memasukkan data default.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper utility to show dynamic alerts
+  const showStatus = (type: 'success' | 'error', text: string) => {
+    setStatusMsg({ type, text });
+    setTimeout(() => setStatusMsg({ type: 'success', text: '' }), 4000);
+  };
+
+  if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-[#1A1A1A] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#EAB308]"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#1A1A1A] text-white">
+        <div className="animate-pulse">Loading Admin Session...</div>
       </div>
     );
   }
 
-  const SQL_SCRIPT = `-- SQL Script untuk Motrek Aja Database
-
--- 1. Tabel Portofolio Galeri
-CREATE TABLE IF NOT EXISTS public.portfolio (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-  title text NOT NULL,
-  category text NOT NULL,
-  url text NOT NULL
-);
-
--- 2. Tabel Formulir Booking Inquiries
-CREATE TABLE IF NOT EXISTS public.inquiries (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-  name text NOT NULL,
-  email text NOT NULL,
-  booking_date date NOT NULL,
-  message text NOT NULL
-);
-
--- 3. Tabel Jurnal Cerita BTS
-CREATE TABLE IF NOT EXISTS public.journals (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-  title text NOT NULL,
-  excerpt text NOT NULL,
-  date text NOT NULL,
-  "imageUrl" text NOT NULL,
-  "videoUrl" text
-);
-
--- Tambahkan Kebijakan Keamanan Row Level (Optional/Disable for easy test)
-ALTER TABLE public.portfolio ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.journals ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow public read" ON public.portfolio FOR SELECT USING (true);
-CREATE POLICY "Allow admin modification" ON public.portfolio FOR ALL TO authenticated USING (true);
-
-CREATE POLICY "Allow public insert" ON public.inquiries FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow admin read and write" ON public.inquiries FOR ALL TO authenticated USING (true);
-
-CREATE POLICY "Allow public read" ON public.journals FOR SELECT USING (true);
-CREATE POLICY "Allow admin modification" ON public.journals FOR ALL TO authenticated USING (true);`;
-
   return (
-    <div className="min-h-screen bg-[#1A1A1A] text-[#F3F4F6] flex flex-col">
-      {/* Top Header */}
-      <header className="bg-[#2D2D2D] border-b border-white/5 py-4 px-6 md:px-8 flex justify-between items-center relative z-20">
+    <div className="min-h-screen bg-[#1A1A1A] text-[#F3F4F6] pt-[80px]">
+      {/* Admin Top Header */}
+      <header className="fixed top-0 left-0 right-0 z-40 bg-[#2D2D2D] border-b border-white/5 h-[80px] flex items-center px-6 lg:px-12 justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold tracking-tight">
-            Motrek Aja <span className="text-[#EAB308] text-xs font-semibold px-2 py-0.5 rounded-full bg-[#EAB308]/15 border border-[#EAB308]/20">ADMIN</span>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            Motrek Aja<span className="text-[var(--color-accent)]">.</span> <span className="text-xs uppercase bg-[var(--color-accent)]/10 text-[var(--color-accent)] px-2.5 py-1 rounded-full font-medium ml-2 border border-[var(--color-accent)]/20">Admin</span>
           </h1>
-          <span className="text-xs text-[#9CA3AF] border-l border-white/10 pl-4 hidden sm:inline">
-            Mode: {mode === 'demo' ? '⚡ Simulasi (Local)' : '🔗 Terhubung Supabase'}
-          </span>
         </div>
-
         <div className="flex items-center gap-4">
-          {mode === 'demo' && (
-            <button 
-              onClick={() => {
-                sessionStorage.setItem('motrek_admin_mode', 'supabase');
-                window.location.reload();
-              }}
-              className="text-xs text-[#EAB308] border border-[#EAB308]/20 bg-[#EAB308]/5 px-3 py-1.5 rounded-lg hover:bg-[#EAB308]/10 transition-colors"
-            >
-              Ganti ke Supabase Mode
-            </button>
-          )}
+          <span className="text-sm text-[var(--color-muted)] hidden sm:inline">{adminEmail}</span>
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-2 text-xs bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 px-3 py-1.5 rounded-lg text-[#9CA3AF] hover:text-white transition-colors"
+            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40 rounded-xl text-sm font-semibold transition-colors"
           >
-            <LogOut size={14} />
-            <span>Keluar</span>
+            Keluar (Logout)
           </button>
         </div>
       </header>
 
-      {/* Main Body Grid */}
-      <div className="flex-1 flex flex-col md:flex-row">
-        {/* Navigation Sidebar */}
-        <aside className="w-full md:w-64 bg-[#2D2D2D]/60 border-b md:border-b-0 md:border-r border-white/5 p-4 space-y-2">
-          <button
-            onClick={() => setActiveTab('portfolio')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-              activeTab === 'portfolio' 
-                ? 'bg-[#EAB308] text-black shadow-lg shadow-[#EAB308]/10' 
-                : 'text-[#9CA3AF] hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <ImageIcon size={18} />
-            <span>Kelola Portofolio</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('journals')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-              activeTab === 'journals' 
-                ? 'bg-[#EAB308] text-black shadow-lg shadow-[#EAB308]/10' 
-                : 'text-[#9CA3AF] hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <BookOpen size={18} />
-            <span>Kelola Jurnal / BTS</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('inquiries')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all relative ${
-              activeTab === 'inquiries' 
-                ? 'bg-[#EAB308] text-black shadow-lg shadow-[#EAB308]/10' 
-                : 'text-[#9CA3AF] hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Inbox size={18} />
-            <span>Inkuiri / Booking</span>
-            {inquiriesList.length > 0 && (
-              <span className={`absolute right-4 text-[10px] font-bold px-2 py-0.5 rounded-full ${activeTab === 'inquiries' ? 'bg-black text-[#EAB308]' : 'bg-[#EAB308] text-black'}`}>
-                {inquiriesList.length}
-              </span>
-            )}
-          </button>
-
-          <div className="pt-4 border-t border-white/5">
-            <button
-              onClick={() => setActiveTab('setup')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'setup' 
-                  ? 'bg-white/10 text-white' 
-                  : 'text-[#9CA3AF] hover:text-white hover:bg-white/5'
+      {/* Main Admin Panel Container */}
+      <div className="container mx-auto px-6 lg:px-8 py-10">
+        
+        {/* Alerts */}
+        <AnimatePresence>
+          {statusMsg.text && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className={`mb-6 p-4 rounded-xl border text-center ${
+                statusMsg.type === 'success' 
+                  ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                  : 'bg-red-500/10 text-red-400 border-red-500/20'
               }`}
             >
-              <Database size={18} />
-              <span>Status & SQL Setup</span>
-            </button>
+              {statusMsg.text}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Dashboard Tabs Grid */}
+        <div className="flex flex-wrap gap-4 border-b border-white/5 pb-6 mb-10">
+          <button 
+            onClick={() => setActiveTab('gallery')}
+            className={`px-6 py-3 rounded-2xl text-sm font-medium transition-all ${
+              activeTab === 'gallery' 
+                ? 'bg-[var(--color-accent)] text-black font-semibold' 
+                : 'bg-[#2D2D2D] hover:bg-[#3d3d3d] text-[var(--color-muted)] hover:text-white'
+            }`}
+          >
+            📸 Kelola Portofolio ({portfolio.length})
+          </button>
+          <button 
+            onClick={() => setActiveTab('categories')}
+            className={`px-6 py-3 rounded-2xl text-sm font-medium transition-all ${
+              activeTab === 'categories' 
+                ? 'bg-[var(--color-accent)] text-black font-semibold' 
+                : 'bg-[#2D2D2D] hover:bg-[#3d3d3d] text-[var(--color-muted)] hover:text-white'
+            }`}
+          >
+            🏷️ Kelola Kategori ({categories.length})
+          </button>
+          <button 
+            onClick={() => setActiveTab('inquiries')}
+            className={`px-6 py-3 rounded-2xl text-sm font-medium transition-all ${
+              activeTab === 'inquiries' 
+                ? 'bg-[var(--color-accent)] text-black font-semibold' 
+                : 'bg-[#2D2D2D] hover:bg-[#3d3d3d] text-[var(--color-muted)] hover:text-white'
+            }`}
+          >
+            ✉️ Inkuiri Masuk ({inquiries.length})
+          </button>
+        </div>
+
+        {/* Loading Indicator */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--color-accent)] mb-4"></div>
+            <p className="text-[var(--color-muted)]">Mengambil data dari database...</p>
           </div>
-        </aside>
-
-        {/* Workspace Panels */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#EAB308]"></div>
-            </div>
-          ) : (
-            <>
-              {/* PORTFOLIO TAB */}
-              {activeTab === 'portfolio' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h2 className="text-2xl font-bold">Galeri Portofolio</h2>
-                      <p className="text-sm text-[#9CA3AF]">Tambahkan dan sesuaikan karya visual di galeri.</p>
-                    </div>
-                    <button 
-                      onClick={() => handleOpenPhotoModal()}
-                      className="bg-[#EAB308] hover:bg-[#EAB308]/90 text-black font-semibold px-4 py-2 rounded-xl flex items-center gap-2 text-sm shadow-md transition-colors"
-                    >
-                      <Plus size={16} />
-                      <span>Tambah Foto</span>
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {portfolioList.map((photo) => (
-                      <div key={photo.id} className="bg-[#2D2D2D] rounded-2xl overflow-hidden border border-white/5 flex flex-col group">
-                        <div className="relative aspect-video w-full overflow-hidden bg-black/40">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img 
-                            src={photo.url} 
-                            alt={photo.title}
-                            className="object-cover w-full h-full"
-                          />
-                          <span className="absolute top-2 left-2 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-black/60 text-[#EAB308]">
-                            {photo.category}
-                          </span>
-                        </div>
-                        <div className="p-4 flex-1 flex flex-col justify-between">
-                          <h3 className="font-semibold text-sm line-clamp-1 mb-3 text-[#F3F4F6]">{photo.title}</h3>
-                          <div className="flex justify-between items-center pt-2 border-t border-white/5">
-                            <button 
-                              onClick={() => handleOpenPhotoModal(photo)}
-                              className="text-xs text-[#9CA3AF] hover:text-white flex items-center gap-1 transition-colors"
-                            >
-                              <Edit2 size={12} />
-                              <span>Ubah</span>
-                            </button>
-                            <button 
-                              onClick={() => handleDeletePhoto(photo.id)}
-                              className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors"
-                            >
-                              <Trash2 size={12} />
-                              <span>Hapus</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* JOURNALS TAB */}
-              {activeTab === 'journals' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h2 className="text-2xl font-bold">Jurnal & Behind the Scene</h2>
-                      <p className="text-sm text-[#9CA3AF]">Tulis cerita proses kreatif di balik pemotretan.</p>
-                    </div>
-                    <button 
-                      onClick={() => handleOpenJournalModal()}
-                      className="bg-[#EAB308] hover:bg-[#EAB308]/90 text-black font-semibold px-4 py-2 rounded-xl flex items-center gap-2 text-sm shadow-md transition-colors"
-                    >
-                      <Plus size={16} />
-                      <span>Tulis Jurnal</span>
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {journalsList.map((journal) => (
-                      <div key={journal.id} className="bg-[#2D2D2D] rounded-2xl overflow-hidden border border-white/5 flex gap-4 p-4">
-                        <div className="relative w-32 h-24 rounded-lg overflow-hidden bg-black/40 flex-shrink-0">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img 
-                            src={journal.imageUrl || journal.image_url} 
-                            alt={journal.title}
-                            className="object-cover w-full h-full"
-                          />
-                        </div>
-                        <div className="flex-1 flex flex-col justify-between">
-                          <div>
-                            <span className="text-[10px] text-[#EAB308] font-medium">{journal.date}</span>
-                            <h3 className="font-bold text-base mb-1 line-clamp-1">{journal.title}</h3>
-                            <p className="text-xs text-[#9CA3AF] line-clamp-2 leading-relaxed">{journal.excerpt}</p>
-                          </div>
-                          <div className="flex gap-4 mt-2">
-                            <button 
-                              onClick={() => handleOpenJournalModal(journal)}
-                              className="text-xs text-[#9CA3AF] hover:text-white flex items-center gap-1 transition-colors"
-                            >
-                              <Edit2 size={12} />
-                              <span>Edit</span>
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteJournal(journal.id)}
-                              className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors"
-                            >
-                              <Trash2 size={12} />
-                              <span>Hapus</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* INQUIRIES TAB */}
-              {activeTab === 'inquiries' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+        ) : (
+          <div>
+            {/* TAB 1: Gallery Management */}
+            {activeTab === 'gallery' && (
+              <div>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold">Pesan Inkuiri Masuk</h2>
-                    <p className="text-sm text-[#9CA3AF]">Daftar calon klien yang mengirimkan formulir booking.</p>
+                    <h2 className="text-2xl font-bold">Galeri Foto Portofolio</h2>
+                    <p className="text-sm text-[var(--color-muted)]">Tambah, edit, atau hapus karya fotografi yang ditampilkan di situs utama.</p>
                   </div>
+                  <Button variant="primary" onClick={handleOpenAddModal}>
+                    + Tambah Foto Baru
+                  </Button>
+                </div>
 
-                  {inquiriesList.length === 0 ? (
-                    <div className="bg-[#2D2D2D] border border-white/5 rounded-2xl p-12 text-center text-[#9CA3AF]">
-                      <Inbox className="mx-auto mb-4 opacity-30" size={48} />
-                      <p>Belum ada inquiries atau pesan masuk.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {inquiriesList.map((inq) => (
-                        <div key={inq.id} className="bg-[#2D2D2D] rounded-2xl border border-white/5 p-6 flex flex-col md:flex-row justify-between gap-6 relative overflow-hidden">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                              <span className="font-bold text-lg text-white">{inq.name}</span>
-                              <span className="text-sm text-[#9CA3AF]">{inq.email}</span>
-                            </div>
-                            <div className="inline-block bg-white/5 text-[#EAB308] text-xs font-semibold px-3 py-1 rounded-full">
-                              Tanggal Sesi: {inq.booking_date}
-                            </div>
-                            <p className="text-sm text-[#9CA3AF] leading-relaxed pt-2 border-t border-white/5 mt-2">
-                              {inq.message}
-                            </p>
-                          </div>
-                          
-                          <div className="flex md:flex-col justify-end items-end gap-3 mt-4 md:mt-0 flex-shrink-0">
-                            <span className="text-[10px] text-[#9CA3AF]/60">
-                              Diterima: {new Date(inq.created_at || Date.now()).toLocaleDateString('id-ID')}
-                            </span>
-                            <button
-                              onClick={() => handleDeleteInquiry(inq.id)}
-                              className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all mt-auto"
-                            >
-                              <Trash2 size={12} />
-                              <span>Hapus Pesan</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )}
-
-              {/* STATUS & SQL SETUP TAB */}
-              {activeTab === 'setup' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                  <div>
-                    <h2 className="text-2xl font-bold">Diagnostik Database & SQL Inisialisasi</h2>
-                    <p className="text-sm text-[#9CA3AF]">Status integrasi tabel database Supabase Anda.</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className={`p-5 rounded-2xl border ${diagnostics.portfolioTable ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
-                      <h3 className="font-semibold mb-1">Tabel Portfolio</h3>
-                      <p className="text-xs mb-3">{diagnostics.portfolioTable ? 'Tabel Ditemukan' : 'Tabel Belum Dibuat'}</p>
-                      <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded">public.portfolio</span>
-                    </div>
-
-                    <div className={`p-5 rounded-2xl border ${diagnostics.inquiriesTable ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
-                      <h3 className="font-semibold mb-1">Tabel Inquiries</h3>
-                      <p className="text-xs mb-3">{diagnostics.inquiriesTable ? 'Tabel Ditemukan' : 'Tabel Belum Dibuat'}</p>
-                      <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded">public.inquiries</span>
-                    </div>
-
-                    <div className={`p-5 rounded-2xl border ${diagnostics.journalsTable ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
-                      <h3 className="font-semibold mb-1">Tabel Journals</h3>
-                      <p className="text-xs mb-3">{diagnostics.journalsTable ? 'Tabel Ditemukan' : 'Tabel Belum Dibuat'}</p>
-                      <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded">public.journals</span>
-                    </div>
-                  </div>
-
-                  {(!diagnostics.portfolioTable || !diagnostics.inquiriesTable || !diagnostics.journalsTable) && mode === 'supabase' && (
-                    <div className="bg-[#EAB308]/10 border border-[#EAB308]/20 text-[#EAB308] p-5 rounded-2xl flex gap-3 text-sm leading-relaxed">
-                      <AlertTriangle className="w-6 h-6 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-bold mb-1">Inisialisasi Database Diperlukan</p>
-                        <p className="opacity-90">
-                          Situs web mendeteksi bahwa tabel-tabel di atas belum ada di database Supabase Anda. Anda dapat menyalin skrip SQL di bawah ini, masuk ke <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="underline font-semibold inline-flex items-center gap-0.5 hover:opacity-80">Supabase Console <ExternalLink size={12} /></a>, pilih SQL Editor, tempel kode, lalu klik Run.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="bg-[#2D2D2D] rounded-2xl border border-white/5 p-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="flex items-center gap-2 text-sm font-semibold">
-                        <FileCode size={16} className="text-[#EAB308]" />
-                        <span>Skrip SQL Inisialisasi Tabel</span>
-                      </span>
+                {portfolio.length === 0 ? (
+                  <div className="bg-[#2D2D2D] border border-white/5 rounded-3xl p-12 text-center max-w-xl mx-auto">
+                    <p className="text-lg text-[var(--color-muted)] mb-6">Belum ada karya foto portofolio di database Supabase Anda.</p>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                      <Button variant="primary" onClick={handleOpenAddModal}>
+                        + Tambah Manual
+                      </Button>
                       <button 
-                        onClick={() => {
-                          navigator.clipboard.writeText(SQL_SCRIPT);
-                          alert("SQL script berhasil disalin ke clipboard!");
-                        }}
-                        className="text-xs bg-white/5 border border-white/5 hover:border-white/10 hover:bg-white/10 px-3 py-1.5 rounded-lg text-white transition-colors"
+                        onClick={handleSeedDefaultData}
+                        className="px-6 py-3 bg-[var(--color-accent)]/10 hover:bg-[var(--color-accent)]/20 text-[var(--color-accent)] border border-[var(--color-accent)]/20 hover:border-[var(--color-accent)]/40 rounded-xl text-sm font-semibold transition-all"
                       >
-                        Salin Kode
+                        🚀 Seed Data Default (80 Foto)
                       </button>
                     </div>
-                    <pre className="bg-black/30 p-4 rounded-xl text-xs overflow-x-auto text-[#9CA3AF] max-h-72">
-                      <code>{SQL_SCRIPT}</code>
-                    </pre>
                   </div>
-                </motion.div>
-              )}
-            </>
-          )}
-        </main>
+                ) : (() => {
+                  // Group portfolio by title (Event Name)
+                  const groupedPortfolio: Record<string, { category: string; photos: PortfolioItem[] }> = {};
+                  portfolio.forEach(item => {
+                    if (!groupedPortfolio[item.title]) {
+                      groupedPortfolio[item.title] = {
+                        category: item.category,
+                        photos: []
+                      };
+                    }
+                    groupedPortfolio[item.title].photos.push(item);
+                  });
+
+                  const eventNames = Object.keys(groupedPortfolio).sort();
+                  const uniqueCats = Array.from(new Set(portfolio.map(item => item.category)));
+                  const adminCategories = ['Semua', ...uniqueCats.filter(cat => cat !== 'Semua')];
+
+                  const filteredEventNames = eventNames.filter(name => {
+                    if (activeCategoryFilter === 'Semua') return true;
+                    return groupedPortfolio[name].category === activeCategoryFilter;
+                  });
+
+                  return (
+                    <div>
+                      {/* Category Filters for Admin */}
+                      <div className="flex flex-wrap gap-2 mb-8 bg-[#1A1A1A] p-2 rounded-2xl border border-white/5">
+                        {adminCategories.map((cat) => (
+                          <button
+                            key={cat}
+                            onClick={() => setActiveCategoryFilter(cat)}
+                            className={`px-4 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${
+                              activeCategoryFilter === cat
+                                ? 'bg-[var(--color-accent)] text-black font-semibold'
+                                : 'text-[var(--color-muted)] hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+
+                      {filteredEventNames.length === 0 ? (
+                        <div className="bg-[#2D2D2D] border border-white/5 rounded-3xl p-12 text-center text-[var(--color-muted)]">
+                          Tidak ada kegiatan dalam kategori ini.
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {filteredEventNames.map((name) => {
+                            const group = groupedPortfolio[name];
+                            const isExpanded = expandedEvents[name] !== false; // default expanded
+
+                            return (
+                              <div 
+                                key={name}
+                                className="bg-[#2D2D2D] border border-white/5 rounded-3xl overflow-hidden shadow-lg transition-all duration-300"
+                              >
+                                {/* Event Group Header */}
+                                <div 
+                                  onClick={() => toggleEvent(name)}
+                                  className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-white/5 cursor-pointer transition-colors border-b border-white/5 select-none"
+                                >
+                                  <div className="flex flex-wrap items-center gap-3">
+                                    {/* Chevron indicator */}
+                                    <svg 
+                                      xmlns="http://www.w3.org/2000/svg" 
+                                      viewBox="0 0 20 20" 
+                                      fill="currentColor" 
+                                      className={`w-5 h-5 text-[var(--color-muted)] transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`}
+                                    >
+                                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                                    </svg>
+                                    <span className="text-xs font-bold uppercase tracking-widest bg-[var(--color-accent)]/10 text-[var(--color-accent)] px-2.5 py-1 rounded-full border border-[var(--color-accent)]/20">
+                                      {group.category}
+                                    </span>
+                                    <h3 className="text-base font-bold text-white leading-tight">{name}</h3>
+                                    <span className="bg-white/5 text-[var(--color-muted)] text-xs px-2.5 py-1 rounded-lg border border-white/5 font-semibold">
+                                      {group.photos.length} Foto
+                                    </span>
+                                  </div>
+
+                                  {/* Header actions */}
+                                  <div className="flex items-center gap-2 self-stretch sm:self-auto" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      onClick={() => handleOpenEditEventModal(name)}
+                                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 text-white text-xs font-semibold rounded-xl transition-colors"
+                                    >
+                                      ✍️ Edit Nama
+                                    </button>
+                                    <button
+                                      onClick={() => handleOpenAddModalForEvent(name, group.category)}
+                                      className="px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent)]/95 text-black text-xs font-bold rounded-xl transition-all shadow-md shadow-[var(--color-accent)]/10"
+                                    >
+                                      ➕ Tambah Foto
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteEvent(name)}
+                                      className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 hover:border-red-500/30 text-xs font-semibold rounded-xl transition-colors"
+                                    >
+                                      🗑️ Hapus Kegiatan
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Event Group Photos Grid */}
+                                <AnimatePresence initial={false}>
+                                  {isExpanded && (
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: 'auto', opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{ duration: 0.3 }}
+                                      className="overflow-hidden"
+                                    >
+                                      <div className="p-6 bg-[#1F1F1F]/40">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                          {group.photos.map((photo) => (
+                                            <div 
+                                              key={photo.id}
+                                              className="group relative bg-[#2D2D2D] border border-white/5 rounded-2xl overflow-hidden shadow hover:border-white/10 transition-all flex flex-col justify-between"
+                                            >
+                                              <div className="relative aspect-[4/3] w-full bg-[#1A1A1A]">
+                                                <Image 
+                                                  src={photo.url} 
+                                                  alt={name}
+                                                  fill 
+                                                  className="object-cover group-hover:scale-102 transition-transform duration-500"
+                                                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                                                />
+                                              </div>
+                                              <div className="p-3 flex items-center justify-between gap-2 bg-[#2D2D2D]">
+                                                <button 
+                                                  onClick={() => handleOpenEditModal(photo)}
+                                                  className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-[10px] font-bold transition-all border border-white/5 hover:border-white/20 text-center"
+                                                >
+                                                  ✍️ Edit
+                                                </button>
+                                                <button 
+                                                  onClick={() => handleDeletePortfolio(photo.id)}
+                                                  className="px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold transition-all border border-red-500/10 hover:border-red-500/30 text-center"
+                                                  title="Hapus foto"
+                                                >
+                                                  🗑️
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* TAB 2: Category Management */}
+            {activeTab === 'categories' && (
+              <div className="max-w-3xl">
+                <div className="mb-8">
+                  <h2 className="text-2xl font-bold mb-2">Kategori Portofolio</h2>
+                  <p className="text-sm text-[var(--color-muted)]">Kelola kategori yang digunakan untuk memfilter karya foto di galeri depan.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Category List */}
+                  <div className="bg-[#2D2D2D] p-6 rounded-3xl border border-white/5">
+                    <h3 className="text-lg font-bold mb-4 border-b border-white/5 pb-2">Daftar Kategori</h3>
+                    <div className="space-y-3">
+                      {categories.map((cat) => (
+                        <div key={cat} className="flex justify-between items-center bg-[#1A1A1A] px-4 py-3 rounded-2xl border border-white/5">
+                          <span className="font-medium text-white">{cat}</span>
+                          <button 
+                            onClick={() => handleRemoveCategory(cat)}
+                            className="text-red-400 hover:text-red-300 text-xs px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Add New Category */}
+                  <div className="bg-[#2D2D2D] p-6 rounded-3xl border border-white/5 h-fit">
+                    <h3 className="text-lg font-bold mb-4 border-b border-white/5 pb-2">Tambah Kategori Baru</h3>
+                    <form onSubmit={handleAddCategory} className="space-y-4">
+                      <div>
+                        <label htmlFor="newCat" className="block text-xs font-medium text-[var(--color-muted)] mb-2">Nama Kategori</label>
+                        <input 
+                          type="text" 
+                          id="newCat" 
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="Contoh: Street, Wildlife, Landscape"
+                          className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
+                        />
+                      </div>
+                      <Button type="submit" variant="primary" className="w-full">
+                        + Tambahkan Kategori
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: Inquiries / Bookings submissions */}
+            {activeTab === 'inquiries' && (
+              <div>
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold">Pesan Inkuiri & Booking Masuk</h2>
+                  <p className="text-sm text-[var(--color-muted)]">Lihat daftar calon klien yang menghubungi Anda melalui formulir pemesanan.</p>
+                </div>
+
+                {inquiries.length === 0 ? (
+                  <div className="bg-[#2D2D2D] border border-white/5 rounded-3xl p-12 text-center text-[var(--color-muted)]">
+                    Tidak ada inkuiri pesan masuk saat ini.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {inquiries.map((inq) => (
+                      <div 
+                        key={inq.id}
+                        className="bg-[#2D2D2D] border border-white/5 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row justify-between gap-6 hover:border-white/10 transition-colors"
+                      >
+                        <div className="flex-1 space-y-4">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className="text-lg font-bold text-white">{inq.name}</span>
+                            <span className="text-xs text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-2.5 py-1 rounded-full border border-[var(--color-accent)]/20 font-medium">
+                              {inq.booking_date ? `Sesi: ${inq.booking_date}` : 'Tanpa Tanggal'}
+                            </span>
+                            <span className="text-xs text-[var(--color-muted)]">
+                              {inq.email}
+                            </span>
+                          </div>
+                          <p className="text-[var(--color-muted)] leading-relaxed italic bg-[#1A1A1A] p-4 rounded-2xl border border-white/5 text-sm">
+                            &quot;{inq.message}&quot;
+                          </p>
+                        </div>
+                        <div className="flex md:flex-col justify-end items-end gap-3 self-end md:self-auto">
+                          <a 
+                            href={`mailto:${inq.email}`}
+                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 text-white text-xs font-semibold rounded-xl text-center transition-colors"
+                          >
+                            ✉️ Balas Email
+                          </a>
+                          <button 
+                            onClick={() => handleDeleteInquiry(inq.id)}
+                            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 hover:border-red-500/30 text-xs font-semibold rounded-xl text-center transition-colors"
+                          >
+                            🗑️ Hapus Pesan
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* --- PHOTO MODAL --- */}
-      <AnimatePresence>
-        {isPhotoModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[#2D2D2D] border border-white/10 w-full max-w-lg rounded-3xl p-6 md:p-8 relative shadow-2xl"
+      {/* PORTFOLIO ITEM MODAL (ADD / EDIT) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#2D2D2D] w-full max-w-lg rounded-3xl border border-white/10 p-6 md:p-8 shadow-2xl relative">
+            <button 
+              onClick={() => setIsModalOpen(false)}
+              className="absolute top-4 right-4 text-[var(--color-muted)] hover:text-white text-xl"
             >
-              <button 
-                onClick={() => setIsPhotoModalOpen(false)}
-                className="absolute top-4 right-4 text-[#9CA3AF] hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
-              
-              <h3 className="text-xl font-bold mb-6 text-white">
-                {editingPhoto ? 'Ubah Informasi Foto' : 'Tambah Foto Baru'}
-              </h3>
+              ✕
+            </button>
+            <h3 className="text-2xl font-bold mb-6 text-white">
+              {editingItem ? 'Edit Karya Foto' : 'Tambah Foto Portofolio Baru'}
+            </h3>
 
-              <form onSubmit={handleSavePhoto} className="space-y-6">
-                <div>
-                  <label className="block text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-2">Judul Foto</label>
-                  <input
-                    type="text"
-                    required
-                    value={photoForm.title}
-                    onChange={(e) => setPhotoForm({ ...photoForm, title: e.target.value })}
-                    className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#EAB308] transition-colors text-sm"
-                    placeholder="Contoh: Batur Trail Run Sprint"
-                  />
+            <form onSubmit={handleSavePortfolio} className="space-y-6">
+              {/* Title */}
+              <div>
+                <label htmlFor="title" className="block text-sm font-medium text-[var(--color-muted)] mb-2">Judul Foto</label>
+                <input 
+                  type="text" 
+                  id="title" 
+                  required
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
+                  placeholder="Contoh: Batur Trail Run - High Action"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label htmlFor="category" className="block text-sm font-medium text-[var(--color-muted)] mb-2">Kategori</label>
+                <select 
+                  id="category" 
+                  value={formCategory}
+                  onChange={(e) => setFormCategory(e.target.value)}
+                  className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
+                >
+                  {categories.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Image Preset / Custom URL / Upload Device Selection */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-muted)] mb-2">Pilih Sumber Gambar</label>
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormUrlPreset(LOCAL_PRESET_IMAGES[0]);
+                      setFormUrl('');
+                    }}
+                    className={`py-2 text-[10px] sm:text-xs font-semibold rounded-xl border transition-all ${
+                      formUrlPreset !== 'custom' && formUrlPreset !== 'upload'
+                        ? 'bg-[var(--color-accent)] text-black border-[var(--color-accent)]'
+                        : 'bg-[#1A1A1A] text-[var(--color-muted)] border-white/10 hover:text-white'
+                    }`}
+                  >
+                    Preset Lokal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormUrlPreset('upload');
+                      setFormUrl('');
+                    }}
+                    className={`py-2 text-[10px] sm:text-xs font-semibold rounded-xl border transition-all ${
+                      formUrlPreset === 'upload'
+                        ? 'bg-[var(--color-accent)] text-black border-[var(--color-accent)]'
+                        : 'bg-[#1A1A1A] text-[var(--color-muted)] border-white/10 hover:text-white'
+                    }`}
+                  >
+                    Upload Device
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormUrlPreset('custom');
+                      setFormUrl('');
+                    }}
+                    className={`py-2 text-[10px] sm:text-xs font-semibold rounded-xl border transition-all ${
+                      formUrlPreset === 'custom'
+                        ? 'bg-[var(--color-accent)] text-black border-[var(--color-accent)]'
+                        : 'bg-[#1A1A1A] text-[var(--color-muted)] border-white/10 hover:text-white'
+                    }`}
+                  >
+                    Custom URL
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {formUrlPreset === 'upload' ? (
                   <div>
-                    <label className="block text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-2">Kategori</label>
+                    <label htmlFor="file-upload" className="block text-xs text-[var(--color-muted)] mb-2">Upload File Gambar</label>
+                    <input 
+                      type="file" 
+                      id="file-upload"
+                      accept="image/*"
+                      required={!editingItem}
+                      onChange={handleFileChange}
+                      className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
+                    />
+                    {uploadFilePreview && (
+                      <div className="mt-4 relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-white/5 bg-[#1A1A1A]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img 
+                          src={uploadFilePreview} 
+                          alt="File Preview" 
+                          className="object-cover w-full h-full"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : formUrlPreset !== 'custom' ? (
+                  <div>
+                    <label htmlFor="preset" className="block text-xs text-[var(--color-muted)] mb-2">Pilih Foto Lokal</label>
                     <select
-                      value={photoForm.category}
-                      onChange={(e) => setPhotoForm({ ...photoForm, category: e.target.value })}
-                      className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#EAB308] transition-colors text-sm"
+                      id="preset"
+                      value={formUrlPreset}
+                      onChange={(e) => setFormUrlPreset(e.target.value)}
+                      className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
                     >
-                      {CATEGORIES.map(c => (
-                        <option key={c} value={c}>{c}</option>
+                      {LOCAL_PRESET_IMAGES.map((img, idx) => (
+                        <option key={img} value={img}>Foto Preset {idx + 1} ({img.split('/').pop()})</option>
                       ))}
                     </select>
+                    {/* Live Preview of selected preset */}
+                    <div className="mt-4 relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-white/5 bg-[#1A1A1A]">
+                      <Image 
+                        src={formUrlPreset} 
+                        alt="Live Preview" 
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
                   </div>
+                ) : (
                   <div>
-                    <label className="block text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-2">URL Gambar</label>
-                    <input
-                      type="text"
-                      required
-                      value={photoForm.url}
-                      onChange={(e) => setPhotoForm({ ...photoForm, url: e.target.value })}
-                      className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#EAB308] transition-colors text-sm"
-                      placeholder="/images/best_1.jpg"
+                    <label htmlFor="url" className="block text-xs text-[var(--color-muted)] mb-2">Masukkan HTTP/HTTPS URL Gambar</label>
+                    <input 
+                      type="url" 
+                      id="url" 
+                      required={formUrlPreset === 'custom'}
+                      value={formUrl}
+                      onChange={(e) => setFormUrl(e.target.value)}
+                      className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
+                      placeholder="https://example.com/image.jpg"
                     />
+                    {formUrl && (
+                      <div className="mt-4 relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-white/5 bg-[#1A1A1A]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img 
+                          src={formUrl} 
+                          alt="Live Custom Preview"
+                          className="object-cover w-full h-full"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?auto=format&fit=crop&q=80&w=600';
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
+              </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
-                  <button
-                    type="button"
-                    onClick={() => setIsPhotoModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-white/10 text-sm hover:bg-white/5 transition-colors"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-[#EAB308] hover:bg-[#EAB308]/90 text-black font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors"
-                  >
-                    Simpan
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+              <div className="flex gap-4 pt-4 border-t border-white/5">
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)}
+                  className="w-1/3 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-semibold transition-all border border-white/5 hover:border-white/20"
+                >
+                  Batal
+                </button>
+                <Button type="submit" variant="primary" className="w-2/3">
+                  {editingItem ? 'Simpan Perubahan' : 'Tambahkan Ke Portofolio'}
+                </Button>
+              </div>
+            </form>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
-      {/* --- JOURNAL MODAL --- */}
-      <AnimatePresence>
-        {isJournalModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[#2D2D2D] border border-white/10 w-full max-w-lg rounded-3xl p-6 md:p-8 relative shadow-2xl"
+      {/* EDIT EVENT NAME MODAL */}
+      {isEditEventModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#2D2D2D] w-full max-w-md rounded-3xl border border-white/10 p-6 md:p-8 shadow-2xl relative">
+            <button 
+              onClick={() => setIsEditEventModalOpen(false)}
+              className="absolute top-4 right-4 text-[var(--color-muted)] hover:text-white text-xl"
             >
-              <button 
-                onClick={() => setIsJournalModalOpen(false)}
-                className="absolute top-4 right-4 text-[#9CA3AF] hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
-              
-              <h3 className="text-xl font-bold mb-6 text-white">
-                {editingJournal ? 'Ubah Informasi Jurnal' : 'Tulis Jurnal BTS Baru'}
-              </h3>
+              ✕
+            </button>
+            <h3 className="text-xl font-bold mb-4 text-white">Edit Nama Kegiatan</h3>
+            <p className="text-xs text-[var(--color-muted)] mb-6">
+              Mengubah nama ini akan memperbarui nama kegiatan pada seluruh foto yang tergabung di dalamnya.
+            </p>
 
-              <form onSubmit={handleSaveJournal} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-2">Judul Cerita</label>
-                  <input
-                    type="text"
-                    required
-                    value={journalForm.title}
-                    onChange={(e) => setJournalForm({ ...journalForm, title: e.target.value })}
-                    className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#EAB308] transition-colors text-sm"
-                    placeholder="Merekam Momen Magis..."
-                  />
-                </div>
+            <form onSubmit={handleSaveEventName} className="space-y-6">
+              <div>
+                <label htmlFor="event-name-input" className="block text-sm font-medium text-[var(--color-muted)] mb-2">Nama Kegiatan</label>
+                <input 
+                  type="text" 
+                  id="event-name-input" 
+                  required
+                  value={newEventName}
+                  onChange={(e) => setNewEventName(e.target.value)}
+                  className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
+                  placeholder="Nama Kegiatan Baru"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-2">Kutipan / Deskripsi Singkat</label>
-                  <textarea
-                    required
-                    rows={3}
-                    value={journalForm.excerpt}
-                    onChange={(e) => setJournalForm({ ...journalForm, excerpt: e.target.value })}
-                    className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#EAB308] transition-colors text-sm resize-none"
-                    placeholder="Ringkasan cerita di balik layar pemotretan..."
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-2">Tanggal Rilis</label>
-                    <input
-                      type="text"
-                      required
-                      value={journalForm.date}
-                      onChange={(e) => setJournalForm({ ...journalForm, date: e.target.value })}
-                      className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#EAB308] transition-colors text-sm"
-                      placeholder="Contoh: 12 Mei 2026"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-2">URL Gambar Utama</label>
-                    <input
-                      type="text"
-                      required
-                      value={journalForm.imageUrl}
-                      onChange={(e) => setJournalForm({ ...journalForm, imageUrl: e.target.value })}
-                      className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#EAB308] transition-colors text-sm"
-                      placeholder="/images/best_14.jpg"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-2">URL Video (Opsional - YouTube / Vimeo / etc.)</label>
-                  <input
-                    type="text"
-                    value={journalForm.videoUrl}
-                    onChange={(e) => setJournalForm({ ...journalForm, videoUrl: e.target.value })}
-                    className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#EAB308] transition-colors text-sm"
-                    placeholder="https://..."
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
-                  <button
-                    type="button"
-                    onClick={() => setIsJournalModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-white/10 text-sm hover:bg-white/5 transition-colors"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-[#EAB308] hover:bg-[#EAB308]/90 text-black font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors"
-                  >
-                    Simpan Jurnal
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+              <div className="flex gap-4 pt-4 border-t border-white/5">
+                <button 
+                  type="button" 
+                  onClick={() => setIsEditEventModalOpen(false)}
+                  className="w-1/3 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-semibold transition-all border border-white/5 hover:border-white/20"
+                >
+                  Batal
+                </button>
+                <Button type="submit" variant="primary" className="w-2/3">
+                  Simpan Nama
+                </Button>
+              </div>
+            </form>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,185 +3,134 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import Button from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
-import { Lock, Mail, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
+  // If already logged in, redirect to admin dashboard
   useEffect(() => {
-    // Check if already logged in (Supabase or Demo session)
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        router.push('/admin');
-        return;
-      }
-      
-      const demoLogged = sessionStorage.getItem('motrek_admin_logged');
-      if (demoLogged === 'true') {
+    const checkLogin = () => {
+      const isSessionActive = localStorage.getItem('motrek_admin_logged_in') === 'true';
+      if (isSessionActive) {
         router.push('/admin');
       }
     };
-    checkSession();
+    checkLogin();
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setErrorMessage('');
+    setIsLoading(true);
+    setErrorMsg('');
 
     try {
-      // 1. Try Supabase Auth first
+      // 1. Try local credential fallback first for easy sandbox testing
+      if (email === 'admin@motrekaja.com' && password === 'admin123') {
+        localStorage.setItem('motrek_admin_logged_in', 'true');
+        localStorage.setItem('motrek_admin_email', email);
+        router.push('/admin');
+        return;
+      }
+
+      // 2. Try Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        // 2. If it fails, check if the email/password matches the fallback demo credentials
-        // This is extremely helpful for immediate testing without setting up Supabase Auth yet.
-        if (email === 'admin@motrekaja.com' && password === 'admin123') {
-          sessionStorage.setItem('motrek_admin_logged', 'true');
-          sessionStorage.setItem('motrek_admin_mode', 'demo');
-          router.push('/admin');
-          return;
-        }
-        
-        // Return the actual Supabase error if not matching demo creds
-        throw error;
-      }
-
-      if (data.user) {
-        sessionStorage.setItem('motrek_admin_logged', 'true');
-        sessionStorage.removeItem('motrek_admin_mode'); // Real database mode
+        // If local credentials didn't match and Supabase login failed, show error
+        setErrorMsg(error.message || 'Email atau password salah.');
+      } else if (data?.user) {
+        localStorage.setItem('motrek_admin_logged_in', 'true');
+        localStorage.setItem('motrek_admin_email', data.user.email || email);
         router.push('/admin');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setErrorMessage(err.message || 'Email atau password salah.');
+      setErrorMsg('Terjadi kesalahan sistem. Silakan coba lagi.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleUseDemo = () => {
-    setEmail('admin@motrekaja.com');
-    setPassword('admin123');
-    setIsDemoMode(true);
-  };
-
   return (
-    <div className="min-h-screen bg-[#1A1A1A] flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Background gradients */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-[#EAB308]/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#EAB308]/5 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
+    <div className="min-h-screen flex items-center justify-center bg-[#1A1A1A] px-6">
+      {/* Dynamic Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--color-accent)]/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[var(--color-accent)]/5 rounded-full blur-3xl"></div>
+      </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
+      <motion.div 
+        initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="w-full max-w-md bg-[#2D2D2D] rounded-3xl border border-white/5 p-8 md:p-10 shadow-2xl relative z-10"
+        className="relative z-10 w-full max-w-md bg-[#2D2D2D] p-8 md:p-10 rounded-3xl border border-white/5 shadow-2xl"
       >
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
-            Motrek Aja<span className="text-[#EAB308]">.</span>
+          <h1 className="text-3xl font-bold text-white tracking-tight mb-2">
+            Motrek Aja<span className="text-[var(--color-accent)]">.</span>
           </h1>
-          <p className="text-[#9CA3AF] text-sm">Masuk ke Dashboard Administrator</p>
+          <p className="text-[var(--color-muted)] text-sm">Admin Portal & Dashboard</p>
         </div>
 
-        {errorMessage && (
-          <motion.div
+        {errorMsg && (
+          <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl mb-6 flex items-start gap-3 text-sm"
+            className="bg-red-500/20 text-red-400 text-sm p-4 rounded-xl mb-6 border border-red-500/30 text-center"
           >
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold">Gagal Masuk</p>
-              <p className="opacity-95">{errorMessage}</p>
-            </div>
+            {errorMsg}
           </motion.div>
         )}
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-[var(--color-muted)] mb-2">
               Email
             </label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-3.5 h-5 w-5 text-[#9CA3AF]" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl pl-12 pr-4 py-3.5 text-white placeholder-[#9CA3AF]/50 focus:outline-none focus:border-[#EAB308] transition-colors"
-                placeholder="admin@motrekaja.com"
-              />
-            </div>
+            <input 
+              type="email" 
+              id="email" 
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+              placeholder="admin@motrekaja.com"
+            />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-[var(--color-muted)] mb-2">
               Password
             </label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-3.5 h-5 w-5 text-[#9CA3AF]" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl pl-12 pr-12 py-3.5 text-white placeholder-[#9CA3AF]/50 focus:outline-none focus:border-[#EAB308] transition-colors"
-                placeholder="••••••••"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-3.5 text-[#9CA3AF] hover:text-white transition-colors"
-              >
-                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-              </button>
-            </div>
+            <input 
+              type="password" 
+              id="password" 
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+              placeholder="••••••••"
+            />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#EAB308] hover:bg-[#EAB308]/90 text-black font-semibold py-4 rounded-xl transition-all duration-300 shadow-lg shadow-[#EAB308]/15 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? 'Memproses...' : 'Masuk Sekarang'}
-          </button>
+          <Button type="submit" variant="primary" className="w-full py-3" disabled={isLoading}>
+            {isLoading ? 'Mengautentikasi...' : 'Masuk Ke Dashboard'}
+          </Button>
         </form>
 
-        <div className="relative my-8 text-center">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/5"></div>
-          </div>
-          <span className="relative bg-[#2D2D2D] px-4 text-xs text-[#9CA3AF]/70 uppercase tracking-wider">
-            atau gunakan akun demo
-          </span>
+        <div className="mt-8 text-center text-xs text-[var(--color-muted)] border-t border-white/5 pt-6">
+          <p>Gunakan fallback credential untuk demo:</p>
+          <p className="font-mono mt-1 text-[var(--color-accent)]/80">admin@motrekaja.com / admin123</p>
         </div>
-
-        <button
-          onClick={handleUseDemo}
-          type="button"
-          className="w-full bg-white/5 hover:bg-white/10 text-white font-medium py-3 rounded-xl transition-colors border border-white/5 flex items-center justify-center gap-2 text-sm"
-        >
-          Gunakan Kredensial Demo
-        </button>
-        {isDemoMode && (
-          <p className="text-[11px] text-center text-[#EAB308] mt-3 font-medium">
-            Kredensial diisi otomatis: admin@motrekaja.com / admin123
-          </p>
-        )}
       </motion.div>
     </div>
   );

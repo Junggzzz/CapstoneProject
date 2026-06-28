@@ -40,18 +40,8 @@ export default function JournalPage() {
 
         if (error) {
           console.warn('Could not fetch journals, using fallback.', error);
-          const localJ = localStorage.getItem('demo_journals');
-          if (localJ) {
-            setJournals(JSON.parse(localJ));
-          }
         } else if (data && data.length > 0) {
           setJournals(data);
-        } else {
-          // If connection works but table is empty, check demo data
-          const localJ = localStorage.getItem('demo_journals');
-          if (localJ) {
-            setJournals(JSON.parse(localJ));
-          }
         }
       } catch (err) {
         console.error(err);

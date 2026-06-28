@@ -24,15 +24,6 @@ export default function BookingPage() {
     setIsSubmitting(true);
     setSubmitStatus('idle');
 
-    const newInquiry = {
-      id: Date.now().toString(),
-      name: formData.name,
-      email: formData.email,
-      booking_date: formData.date,
-      message: formData.message,
-      created_at: new Date().toISOString()
-    };
-
     try {
       const { error } = await supabase
         .from('inquiries')
@@ -46,30 +37,15 @@ export default function BookingPage() {
         ]);
 
       if (error) {
-        console.warn("Supabase inquiry insert failed, saving to local demo storage.", error);
-        // Fallback to local storage for demo purposes
-        const existing = localStorage.getItem('demo_inquiries');
-        const list = existing ? JSON.parse(existing) : [];
-        const updated = [newInquiry, ...list];
-        localStorage.setItem('demo_inquiries', JSON.stringify(updated));
-        
-        // Show success since fallback handled it successfully for demo
-        setSubmitStatus('success');
-        setFormData({ name: '', email: '', date: '', message: '' });
+        console.error(error);
+        setSubmitStatus('error');
       } else {
         setSubmitStatus('success');
         setFormData({ name: '', email: '', date: '', message: '' });
       }
     } catch (err) {
       console.error(err);
-      // Fallback to local storage for demo purposes
-      const existing = localStorage.getItem('demo_inquiries');
-      const list = existing ? JSON.parse(existing) : [];
-      const updated = [newInquiry, ...list];
-      localStorage.setItem('demo_inquiries', JSON.stringify(updated));
-
-      setSubmitStatus('success');
-      setFormData({ name: '', email: '', date: '', message: '' });
+      setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);
     }
