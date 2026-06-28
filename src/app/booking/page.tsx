@@ -41,6 +41,14 @@ export default function BookingPage() {
         setSubmitStatus('error');
       } else {
         setSubmitStatus('success');
+        
+        // Format pesan WhatsApp berisi data inkuiri yang diisi
+        const waText = `Halo Dhammas Danendra (Motrek Aja),\n\nSaya ingin membuat inkuiri booking baru:\n\n👤 Nama: ${formData.name}\n✉️ Email: ${formData.email}\n📅 Tanggal Sesi: ${formData.date}\n💬 Kebutuhan: ${formData.message}`;
+        const finalWaLink = `https://wa.me/6281238199989?text=${encodeURIComponent(waText)}`;
+        
+        // Redirect otomatis ke WhatsApp di tab baru
+        window.open(finalWaLink, '_blank');
+        
         setFormData({ name: '', email: '', date: '', message: '' });
       }
     } catch (err) {
