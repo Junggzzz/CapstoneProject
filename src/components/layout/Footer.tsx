@@ -26,8 +26,6 @@ export default function Footer() {
               <li><Link href="/" className="text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors">Beranda</Link></li>
               <li><Link href="/portfolio" className="text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors">Portofolio</Link></li>
               <li><Link href="/about" className="text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors">Tentang Kami</Link></li>
-              <li><Link href="/journal" className="text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors">Jurnal</Link></li>
-              <li><Link href="/faq" className="text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors">FAQ</Link></li>
             </ul>
           </div>
           

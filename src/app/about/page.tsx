@@ -33,7 +33,7 @@ export default function AboutPage() {
             className="relative h-[500px] md:h-[600px] w-full rounded-3xl overflow-hidden shadow-2xl border border-white/10"
           >
             <Image 
-              src="/images/best_9.jpg" 
+              src="/images/specialized_ride_1.jpg" 
               alt="Fotografer beraksi" 
               fill
               sizes="(max-width: 768px) 100vw, 50vw"
@@ -82,7 +82,7 @@ export default function AboutPage() {
             <div className="max-w-sm">
               <div className="relative w-48 h-48 mx-auto rounded-full overflow-hidden mb-6 border-4 border-[var(--color-secondary)]">
                 <Image 
-                  src="/images/best_8.jpg" 
+                  src="/images/riding_pandawa_2.jpg" 
                   alt="Founder" 
                   fill
                   sizes="192px"

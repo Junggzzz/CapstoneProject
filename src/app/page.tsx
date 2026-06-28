@@ -6,12 +6,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Button from '@/components/ui/Button';
 
 const HERO_IMAGES = [
-  { src: '/images/best_13.jpg', alt: 'Running for Passion – Female Runner' },
-  { src: '/images/best_5.jpg',  alt: 'Batur Trail Run – Race Day' },
-  { src: '/images/best_11.jpg', alt: 'Running for Passion x Little Canggu' },
-  { src: '/images/best_3.jpg',  alt: 'Batur International Trail Run – Finish' },
-  { src: '/images/best_15.jpg', alt: 'Simply Padel – Backhand Action' },
-  { src: '/images/best_7.jpg',  alt: 'Batur Trail Run – Group Run Savanna' },
+  { src: '/images/running_passion_1.jpg',  alt: 'Running for Passion' },
+  { src: '/images/ahi_trip_1.jpg',         alt: 'AHI Trip Bali' },
+  { src: '/images/specialized_ride_1.jpg', alt: 'Specialized Day 1 Ride' },
+  { src: '/images/batur_trail_1.jpg',      alt: 'Batur Trail Run' },
+  { src: '/images/simply_padel_1.jpg',     alt: 'Simply Padel' },
+  { src: '/images/langit_birthday_1.jpg',  alt: 'Langit 6th Birthday' },
 ];
 
 export default function Home() {
@@ -109,9 +109,9 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { img: '/portofolio/weddingevent.png',     icon: '💍', title: 'Event & Wedding',     desc: 'Kami menangkap kemegahan dan keintiman setiap perayaan dengan gaya sinematik.' },
-              { img: '/portofolio/watchproduct.png',     icon: '📸', title: 'Komersial & Produk',  desc: 'Menonjolkan nilai jual terbaik produk Anda melalui pencahayaan dan komposisi premium.' },
-              { img: '/portofolio/personalportrait.png', icon: '✨', title: 'Potret Personal',      desc: 'Fotografi personal dan profil profesional yang memancarkan aura otentik Anda.' },
+              { img: '/images/specialized_ride_1.jpg', icon: '🚴', title: 'Sports Photography',   desc: 'Mengabadikan aksi dinamis, kecepatan, dan energi atlet dalam kompetisi olahraga.' },
+              { img: '/images/ahi_trip_1.jpg',         icon: '🎉', title: 'Event Photography',    desc: 'Mendokumentasikan kemeriahan, momen penting, dan cerita dalam berbagai acara.' },
+              { img: '/images/langit_birthday_1.jpg',  icon: '👤', title: 'Portrait Photography',   desc: 'Fotografi potret personal dan profil profesional yang memancarkan karakter otentik.' },
             ].map((service, index) => (
               <motion.div 
                 key={index}
@@ -193,7 +193,7 @@ export default function Home() {
       <section className="py-24 relative overflow-hidden flex items-center justify-center">
         <div className="absolute inset-0 bg-black z-0">
           <Image 
-            src="/images/best_12.jpg" 
+            src="/images/running_passion_2.jpg" 
             alt="Motrek Aja CTA" 
             fill
             sizes="100vw"

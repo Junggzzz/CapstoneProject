@@ -21,8 +21,6 @@ export default function Navbar() {
           <Link href="/" className={`text-sm font-medium transition-colors hover:text-[var(--color-accent)] ${pathname === '/' ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]'}`}>Beranda</Link>
           <Link href="/portfolio" className={`text-sm font-medium transition-colors hover:text-[var(--color-accent)] ${pathname === '/portfolio' ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]'}`}>Portofolio</Link>
           <Link href="/about" className={`text-sm font-medium transition-colors hover:text-[var(--color-accent)] ${pathname === '/about' ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]'}`}>Tentang</Link>
-          <Link href="/journal" className={`text-sm font-medium transition-colors hover:text-[var(--color-accent)] ${pathname === '/journal' ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]'}`}>Jurnal</Link>
-          <Link href="/faq" className={`text-sm font-medium transition-colors hover:text-[var(--color-accent)] ${pathname === '/faq' ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]'}`}>FAQ</Link>
         </nav>
 
         <div className="hidden md:block">
