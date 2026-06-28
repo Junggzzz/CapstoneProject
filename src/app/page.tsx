@@ -14,13 +14,39 @@ const HERO_IMAGES = [
   { src: '/images/langit_birthday_1.jpg',  alt: 'Langit 6th Birthday' },
 ];
 
+const TESTIMONIALS = [
+  {
+    quote: "Hasil foto aksi sepedanya luar biasa tajam! Mereka berhasil menangkap momen-momen krusial dengan timing yang sangat pas. Komposisinya premium dan sangat cocok untuk kebutuhan promosi komersial kami.",
+    name: "Gung Ananta",
+    role: "Marketing Manager, Specialized Bali"
+  },
+  {
+    quote: "Sangat puas dengan dokumentasi event grand opening cafe kami. Motrek Aja bisa menangkap interaksi natural pengunjung dan kehangatan suasana dengan kualitas pencahayaan yang sangat cinematic.",
+    name: "Rian Kusuma",
+    role: "Founder, Little Canggu"
+  },
+  {
+    quote: "Kerja sama yang luar biasa! Foto-foto peserta saat menaklukkan medan savana Gunung Batur terekam dengan sangat dramatis dan penuh emosi. Rekomendasi utama untuk dokumentasi event olahraga outdoor.",
+    name: "Sonia Indah",
+    role: "Organizer, Batur Trail Run"
+  }
+];
+
 export default function Home() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [activeTestimonial, setActiveTestimonial] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % HERO_IMAGES.length);
     }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveTestimonial((prev) => (prev + 1) % TESTIMONIALS.length);
+    }, 6000);
     return () => clearInterval(timer);
   }, []);
 
@@ -186,25 +212,48 @@ export default function Home() {
             ))}
           </div>
 
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7 }}
-            className="max-w-4xl mx-auto bg-black/30 p-10 md:p-14 rounded-3xl relative overflow-hidden border border-white/5"
-          >
+          <div className="max-w-4xl mx-auto bg-black/30 p-10 md:p-14 rounded-3xl relative overflow-hidden border border-white/5 min-h-[320px] flex flex-col justify-between">
             <div className="absolute top-0 left-0 w-32 h-32 bg-[var(--color-accent)]/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-            <div className="text-center relative z-10">
-              <div className="text-5xl text-[var(--color-accent)] mb-6">&quot;</div>
-              <p className="text-xl md:text-3xl italic font-light mb-8 leading-relaxed">
-                Hasil fotonya sangat memuaskan, tone warnanya sinematik seperti yang kami inginkan. Fotografer sangat profesional dan bisa menangkap momen candid dengan sempurna.
-              </p>
+            <div className="relative z-10 text-center flex-1 flex flex-col justify-between">
               <div>
-                <h4 className="font-semibold text-lg">Andi & Rina</h4>
-                <p className="text-[var(--color-muted)]">Wedding Client</p>
+                <div className="text-5xl text-[var(--color-accent)] mb-4">&quot;</div>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeTestimonial}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.4 }}
+                    className="min-h-[140px] md:min-h-[100px] flex items-center justify-center"
+                  >
+                    <p className="text-lg md:text-2xl italic font-light leading-relaxed">
+                      {TESTIMONIALS[activeTestimonial].quote}
+                    </p>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+              <div className="mt-6">
+                <h4 className="font-semibold text-lg text-white">{TESTIMONIALS[activeTestimonial].name}</h4>
+                <p className="text-[var(--color-muted)] text-sm">{TESTIMONIALS[activeTestimonial].role}</p>
               </div>
             </div>
-          </motion.div>
+            
+            {/* Dots navigation */}
+            <div className="flex justify-center gap-2 mt-6 relative z-10">
+              {TESTIMONIALS.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveTestimonial(idx)}
+                  className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                    activeTestimonial === idx 
+                      ? 'bg-[var(--color-accent)] w-6' 
+                      : 'bg-white/20 hover:bg-white/40'
+                  }`}
+                  aria-label={`Pilih testimonial ${idx + 1}`}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
