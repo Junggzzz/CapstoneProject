@@ -29,12 +29,24 @@ export default function AdminLoginPage() {
     setIsLoading(true);
     setErrorMsg('');
 
+    // Deteksi jika ENV belum di-set di hosting (Vercel)
+    const isPlaceholder = !process.env.NEXT_PUBLIC_SUPABASE_URL || 
+                          process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder') ||
+                          !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+                          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.includes('placeholder');
+
     try {
       // 1. Try local credential fallback first for easy sandbox testing
       if (email === 'admin@motrekaja.com' && password === 'admin123') {
         localStorage.setItem('motrek_admin_logged_in', 'true');
         localStorage.setItem('motrek_admin_email', email);
         router.push('/admin');
+        return;
+      }
+
+      if (isPlaceholder) {
+        setErrorMsg('Supabase belum terkonfigurasi di Vercel. Silakan tambahkan Environment Variables NEXT_PUBLIC_SUPABASE_URL dan NEXT_PUBLIC_SUPABASE_ANON_KEY di dashboard Vercel Anda.');
+        setIsLoading(false);
         return;
       }
 
