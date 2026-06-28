@@ -158,12 +158,31 @@ export default function Home() {
             <p className="text-[var(--color-muted)] text-lg">Klien yang telah bekerja sama dengan kami.</p>
           </motion.div>
 
-          {/* Dummy Client Logos Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-20 opacity-50 grayscale">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center justify-center p-6 bg-black/20 rounded-xl">
-                <span className="text-2xl font-bold tracking-widest text-[var(--color-muted)]">KLIEN {i}</span>
-              </div>
+          {/* Real Client Logos Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-6 mb-20">
+            {[
+              { name: 'SPECIALIZED', accent: 'BALI', icon: '🚴' },
+              { name: 'LITTLE', accent: 'CANGGU', icon: '☕' },
+              { name: 'SRADHA', accent: 'COFFEE', icon: '🌱' },
+              { name: 'PADEL', accent: 'BALI', icon: '🎾' },
+              { name: 'DEWATA', accent: 'RIDE', icon: '🏍️' },
+              { name: 'BATUR', accent: 'TRAIL RUN', icon: '⛰️' },
+            ].map((client, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 0.7, y: 0 }}
+                viewport={{ once: true }}
+                whileHover={{ scale: 1.05, opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="flex flex-col items-center justify-center p-6 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-[var(--color-accent)]/20 rounded-2xl transition-all duration-300 group cursor-pointer text-center"
+              >
+                <span className="text-2xl mb-2 group-hover:scale-110 transition-transform duration-300">{client.icon}</span>
+                <div className="font-bold text-[10px] sm:text-xs tracking-widest text-white leading-tight uppercase">
+                  {client.name}
+                  <span className="block text-[var(--color-accent)] font-semibold mt-0.5">{client.accent}</span>
+                </div>
+              </motion.div>
             ))}
           </div>
 
