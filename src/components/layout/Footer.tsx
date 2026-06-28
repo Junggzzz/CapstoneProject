@@ -33,7 +33,7 @@ export default function Footer() {
             <h4 className="text-lg font-semibold mb-6">Kontak Kami</h4>
             <ul className="space-y-3">
               <li className="text-[var(--color-muted)]">
-                WhatsApp: <a href="https://wa.me/6285847487597" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-accent)] transition-colors">+62 858-4748-7597</a>
+                WhatsApp: <a href="https://wa.me/6281238199989" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-accent)] transition-colors">+62 812-3819-9989</a>
               </li>
               <li className="text-[var(--color-muted)]">
                 Instagram: <a href="https://instagram.com/motrek.aja" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-accent)] transition-colors">@motrek.aja</a>

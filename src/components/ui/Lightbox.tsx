@@ -103,7 +103,7 @@ export default function Lightbox({
                 <div className="flex items-center gap-4">
                   <p className="text-sm opacity-60">{currentIndex + 1} / {images.length}</p>
                   <a
-                    href={`https://wa.me/6285847487597?text=${encodeURIComponent(`Halo Motrek Aja, saya tertarik untuk booking sesi foto seperti di portfolio "${currentImage.title}"`)}`}
+                    href={`https://wa.me/6281238199989?text=${encodeURIComponent(`Halo Motrek Aja, saya tertarik untuk booking sesi foto seperti di portfolio "${currentImage.title}"`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs font-semibold px-4 py-2 rounded-full transition-colors shadow-lg"

@@ -52,7 +52,7 @@ export default function BookingPage() {
   };
 
   const waMessage = `Halo Motrek Aja, saya ingin berkonsultasi mengenai sesi pemotretan.`;
-  const waLink = `https://wa.me/6285847487597?text=${encodeURIComponent(waMessage)}`;
+  const waLink = `https://wa.me/6281238199989?text=${encodeURIComponent(waMessage)}`;
 
   return (
     <div className="min-h-screen pt-24 pb-16 flex items-center">

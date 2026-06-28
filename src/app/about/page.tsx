@@ -82,7 +82,7 @@ export default function AboutPage() {
             <div className="max-w-sm">
               <div className="relative w-48 h-48 mx-auto rounded-full overflow-hidden mb-6 border-4 border-[var(--color-secondary)]">
                 <Image 
-                  src="/images/riding_pandawa_2.jpg" 
+                  src="/images/Dhammas.jpeg" 
                   alt="Founder" 
                   fill
                   sizes="192px"
