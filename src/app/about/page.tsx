@@ -89,10 +89,10 @@ export default function AboutPage() {
                   className="object-cover grayscale hover:grayscale-0 transition-all duration-500"
                 />
               </div>
-              <h3 className="text-2xl font-semibold mb-2">Budi Santoso</h3>
+              <h3 className="text-2xl font-semibold mb-2">Dhammas Danendra</h3>
               <p className="text-[var(--color-accent)] font-medium mb-4">Lead Photographer & Founder</p>
               <p className="text-[var(--color-muted)] leading-relaxed">
-                Dengan pengalaman lebih dari 10 tahun di industri kreatif, Budi memimpin Motrek Aja dengan visi sinematik dan perhatian luar biasa pada detail.
+                Dengan pengalaman 5 tahun lebih di industri kreatif, Dhammas memimpin Motrek Aja dengan visi sinematik dan perhatian luar biasa pada detail.
               </p>
             </div>
           </div>
