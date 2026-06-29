@@ -162,7 +162,7 @@ export default function Home() {
                 <div className="absolute bottom-0 left-0 right-0 p-8">
                   <div className="text-3xl mb-3">{service.icon}</div>
                   <h3 className="text-xl font-bold mb-2 text-white">{service.title}</h3>
-                  <p className="text-[var(--color-muted)] text-sm leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity duration-500 max-h-0 group-hover:max-h-24 overflow-hidden">{service.desc}</p>
+                  <p className="text-[var(--color-muted)] text-sm leading-relaxed opacity-100 max-h-24 md:opacity-0 md:group-hover:opacity-100 md:max-h-0 md:group-hover:max-h-24 transition-all duration-500 overflow-hidden">{service.desc}</p>
                 </div>
               </motion.div>
             ))}
