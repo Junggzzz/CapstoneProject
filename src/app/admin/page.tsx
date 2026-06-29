@@ -21,6 +21,7 @@ interface Inquiry {
   email: string;
   booking_date: string;
   message: string;
+  status?: string;
   created_at?: string;
 }
 
@@ -406,6 +407,37 @@ export default function AdminDashboardPage() {
     } catch (err: any) {
       console.error(err);
       showStatus('error', err.message || 'Gagal menghapus inkuiri.');
+    }
+  };
+
+  // Update Inquiry Status
+  const handleUpdateInquiryStatus = async (id: string, currentStatus: string) => {
+    let nextStatus = 'Pending';
+    if (!currentStatus || currentStatus === 'Pending') {
+      nextStatus = 'Sudah Dihubungi';
+    } else if (currentStatus === 'Sudah Dihubungi') {
+      nextStatus = 'Selesai';
+    } else {
+      nextStatus = 'Pending';
+    }
+
+    try {
+      const { error } = await supabase
+        .from('inquiries')
+        .update({ status: nextStatus })
+        .eq('id', id);
+
+      if (error) {
+        console.warn('Supabase update failed (might be missing status column), updating local state only:', error);
+        setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, status: nextStatus } : inq));
+        showStatus('error', 'Status diubah lokal. Untuk menyimpan permanen, buat kolom "status" (text) pada tabel inquiries di Supabase.');
+      } else {
+        setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, status: nextStatus } : inq));
+        showStatus('success', 'Status inkuiri berhasil diperbarui.');
+      }
+    } catch (err) {
+      console.error(err);
+      setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, status: nextStatus } : inq));
     }
   };
 
@@ -816,6 +848,31 @@ export default function AdminDashboardPage() {
                             <span className="text-xs text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-2.5 py-1 rounded-full border border-[var(--color-accent)]/20 font-medium">
                               {inq.booking_date ? `Sesi: ${inq.booking_date}` : 'Tanpa Tanggal'}
                             </span>
+
+                            {/* Status Badge */}
+                            {(() => {
+                              const status = inq.status || 'Pending';
+                              if (status === 'Sudah Dihubungi') {
+                                return (
+                                  <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2.5 py-1 rounded-full border border-yellow-400/20 font-medium">
+                                    📞 Sudah Dihubungi
+                                  </span>
+                                );
+                              }
+                              if (status === 'Selesai') {
+                                return (
+                                  <span className="text-xs text-green-400 bg-green-400/10 px-2.5 py-1 rounded-full border border-green-400/20 font-medium">
+                                    ✅ Sesi Terjadwal
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="text-xs text-red-400 bg-red-400/10 px-2.5 py-1 rounded-full border border-red-400/20 font-medium">
+                                  ⏳ Belum Dihubungi
+                                </span>
+                              );
+                            })()}
+
                             <span className="text-xs text-[var(--color-muted)]">
                               {inq.email}
                             </span>
@@ -824,16 +881,16 @@ export default function AdminDashboardPage() {
                             &quot;{inq.message}&quot;
                           </p>
                         </div>
-                        <div className="flex md:flex-col justify-end items-end gap-3 self-end md:self-auto">
-                          <a 
-                            href={`mailto:${inq.email}`}
-                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 text-white text-xs font-semibold rounded-xl text-center transition-colors"
+                        <div className="flex md:flex-col justify-end items-end gap-3 self-end md:self-auto min-w-[140px]">
+                          <button 
+                            onClick={() => handleUpdateInquiryStatus(inq.id, inq.status || 'Pending')}
+                            className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 text-white text-xs font-semibold rounded-xl text-center transition-colors"
                           >
-                            ✉️ Balas Email
-                          </a>
+                            🔄 Ubah Status
+                          </button>
                           <button 
                             onClick={() => handleDeleteInquiry(inq.id)}
-                            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 hover:border-red-500/30 text-xs font-semibold rounded-xl text-center transition-colors"
+                            className="w-full px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 hover:border-red-500/30 text-xs font-semibold rounded-xl text-center transition-colors"
                           >
                             🗑️ Hapus Pesan
                           </button>
