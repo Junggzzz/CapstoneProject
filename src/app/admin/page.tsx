@@ -411,33 +411,24 @@ export default function AdminDashboardPage() {
   };
 
   // Update Inquiry Status
-  const handleUpdateInquiryStatus = async (id: string, currentStatus: string) => {
-    let nextStatus = 'Pending';
-    if (!currentStatus || currentStatus === 'Pending') {
-      nextStatus = 'Sudah Dihubungi';
-    } else if (currentStatus === 'Sudah Dihubungi') {
-      nextStatus = 'Selesai';
-    } else {
-      nextStatus = 'Pending';
-    }
-
+  const handleUpdateInquiryStatus = async (id: string, newStatus: string) => {
     try {
       const { error } = await supabase
         .from('inquiries')
-        .update({ status: nextStatus })
+        .update({ status: newStatus })
         .eq('id', id);
 
       if (error) {
         console.warn('Supabase update failed (might be missing status column), updating local state only:', error);
-        setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, status: nextStatus } : inq));
+        setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, status: newStatus } : inq));
         showStatus('error', 'Status diubah lokal. Untuk menyimpan permanen, buat kolom "status" (text) pada tabel inquiries di Supabase.');
       } else {
-        setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, status: nextStatus } : inq));
+        setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, status: newStatus } : inq));
         showStatus('success', 'Status inkuiri berhasil diperbarui.');
       }
     } catch (err) {
       console.error(err);
-      setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, status: nextStatus } : inq));
+      setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, status: newStatus } : inq));
     }
   };
 
@@ -881,16 +872,22 @@ export default function AdminDashboardPage() {
                             &quot;{inq.message}&quot;
                           </p>
                         </div>
-                        <div className="flex md:flex-col justify-end items-end gap-3 self-end md:self-auto min-w-[140px]">
-                          <button 
-                            onClick={() => handleUpdateInquiryStatus(inq.id, inq.status || 'Pending')}
-                            className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 text-white text-xs font-semibold rounded-xl text-center transition-colors"
-                          >
-                            🔄 Ubah Status
-                          </button>
+                        <div className="flex md:flex-col justify-end items-end gap-3 self-end md:self-auto min-w-[150px]">
+                          <div className="w-full">
+                            <label className="block text-[10px] text-[var(--color-muted)] mb-1 font-semibold uppercase tracking-wider">Status</label>
+                            <select 
+                              value={inq.status || 'Pending'}
+                              onChange={(e) => handleUpdateInquiryStatus(inq.id, e.target.value)}
+                              className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-[var(--color-accent)] transition-colors text-xs font-semibold cursor-pointer"
+                            >
+                              <option value="Pending">⏳ Belum Dihubungi</option>
+                              <option value="Sudah Dihubungi">📞 Sudah Dihubungi</option>
+                              <option value="Selesai">✅ Sesi Terjadwal</option>
+                            </select>
+                          </div>
                           <button 
                             onClick={() => handleDeleteInquiry(inq.id)}
-                            className="w-full px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 hover:border-red-500/30 text-xs font-semibold rounded-xl text-center transition-colors"
+                            className="w-full px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 hover:border-red-500/30 text-xs font-semibold rounded-xl text-center transition-colors mt-1"
                           >
                             🗑️ Hapus Pesan
                           </button>
